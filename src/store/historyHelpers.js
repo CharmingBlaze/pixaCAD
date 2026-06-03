@@ -144,11 +144,18 @@ export function snapshotObjects(objects) {
         o.meshModifiers?.mirrorAxis === 'y' || o.meshModifiers?.mirrorAxis === 'z'
           ? o.meshModifiers.mirrorAxis
           : 'x',
-      subdivisionLevel: o.meshModifiers?.subdivisionLevel ? 1 : 0,
+      subdivisionLevel: clampMeshModifierSubdivisionLevel(o.meshModifiers?.subdivisionLevel),
     },
     visible: o.visible !== false,
     locked: !!o.locked,
   }));
+}
+
+/** @param {number | undefined | null} level */
+function clampMeshModifierSubdivisionLevel(level) {
+  const n = Math.round(Number(level));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(5, n);
 }
 
 /**
@@ -193,7 +200,7 @@ export function restoreObjects(snapshots) {
           o.meshModifiers?.mirrorAxis === 'y' || o.meshModifiers?.mirrorAxis === 'z'
             ? o.meshModifiers.mirrorAxis
             : 'x',
-        subdivisionLevel: o.meshModifiers?.subdivisionLevel ? 1 : 0,
+        subdivisionLevel: clampMeshModifierSubdivisionLevel(o.meshModifiers?.subdivisionLevel),
       },
       visible: o.visible !== false,
       locked: !!o.locked,

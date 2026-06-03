@@ -5,7 +5,12 @@ import {
   boxMetrics,
   formatDrawSize,
 } from '../../lib/draw/cadDraw.js';
-import { evaluateObjectMesh, normalizeMeshModifiers } from '../../lib/mesh/modifiers.js';
+import {
+  clampSubdivisionLevel,
+  evaluateObjectMesh,
+  MAX_MESH_SUBDIVISION_LEVEL,
+  normalizeMeshModifiers,
+} from '../../lib/mesh/modifiers.js';
 
 export function PropertiesPanel() {
   const selected = useEditorStore((s) => s.objects.find((o) => o.id === s.selectedId) ?? null);
@@ -205,7 +210,7 @@ export function PropertiesPanel() {
                 <input
                   type="number"
                   min="0"
-                  max="1"
+                  max={MAX_MESH_SUBDIVISION_LEVEL}
                   step="1"
                   value={meshModifiers.subdivisionLevel}
                   disabled={selected.locked}
@@ -213,7 +218,7 @@ export function PropertiesPanel() {
                     updateObject(selected.id, {
                       meshModifiers: {
                         ...meshModifiers,
-                        subdivisionLevel: Number(e.target.value) >= 1 ? 1 : 0,
+                        subdivisionLevel: clampSubdivisionLevel(e.target.value),
                       },
                     })
                   }

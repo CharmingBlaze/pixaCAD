@@ -1,5 +1,8 @@
 import { mirrorMesh, subdivideFaces } from './operations.js';
 
+/** @type {5} */
+export const MAX_MESH_SUBDIVISION_LEVEL = 5;
+
 /**
  * @typedef {Object} MeshModifiers
  * @property {boolean} [mirrorEnabled]
@@ -7,21 +10,27 @@ import { mirrorMesh, subdivideFaces } from './operations.js';
  * @property {number} [subdivisionLevel]
  */
 
+/** @param {number | undefined | null} level */
+export function clampSubdivisionLevel(level) {
+  const n = Math.round(Number(level));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(MAX_MESH_SUBDIVISION_LEVEL, n);
+}
+
 /** @param {MeshModifiers | undefined | null} modifiers */
 export function normalizeMeshModifiers(modifiers) {
   const axis = modifiers?.mirrorAxis === 'y' || modifiers?.mirrorAxis === 'z' ? modifiers.mirrorAxis : 'x';
-  const subdivisionLevel = modifiers?.subdivisionLevel ? 1 : 0;
   return {
     mirrorEnabled: !!modifiers?.mirrorEnabled,
     mirrorAxis: axis,
-    subdivisionLevel,
+    subdivisionLevel: clampSubdivisionLevel(modifiers?.subdivisionLevel),
   };
 }
 
 /**
  * Applies lightweight non-destructive mesh modifiers for viewport/export.
  * The stack is intentionally tiny for game-friendly low-poly work:
- * mirror first, then at most one subdivision pass.
+ * mirror first, then up to five subdivision passes.
  *
  * @param {import('./EditableMesh.js').EditableMesh | null | undefined} mesh
  * @param {MeshModifiers | undefined | null} modifiers
@@ -35,7 +44,7 @@ export function evaluateMeshModifiers(mesh, modifiers) {
   if (normalized.mirrorEnabled) {
     result = mirrorMesh(result, normalized.mirrorAxis);
   }
-  if (normalized.subdivisionLevel > 0) {
+  for (let level = 0; level < normalized.subdivisionLevel; level += 1) {
     result = subdivideFaces(result, result.faces.map((_, index) => index));
   }
   return result;

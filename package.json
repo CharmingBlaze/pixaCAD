@@ -12,7 +12,7 @@
     "test:e2e:headed": "npm run build && playwright test --headed",
     "themes": "node scripts/build-themes.mjs",
     "desktop:dev": "wails dev",
-    "desktop:build": "wails build"
+    "desktop:build": "wails build -clean && go run github.com/tc-hib/go-winres@v0.3.3 patch --in winres/winres.json --delete --no-backup build/bin/pixaCAD.exe"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",
