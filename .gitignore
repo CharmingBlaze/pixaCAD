@@ -1,0 +1,10 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*
