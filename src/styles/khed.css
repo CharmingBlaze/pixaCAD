@@ -471,7 +471,7 @@ button {
 }
 
 .khedRight .scenePanel {
-  padding: 6px 4px 6px 2px;
+  padding: 6px 6px 6px 8px;
 }
 
 .khedRight .materialPanel,
@@ -1257,7 +1257,7 @@ button {
   min-height: 220px;
   background: var(--t-panel-grad);
   border-bottom: 1px solid #716f64;
-  padding: 6px 4px 6px 2px;
+  padding: 6px 6px 6px 8px;
   overflow-y: auto;
 }
 

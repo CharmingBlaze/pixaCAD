@@ -22,14 +22,44 @@ test.describe('release smoke', () => {
     const objectCount = await storeEval(page, () => window.__pixaCadStore.getState().objects.length);
     expect(objectCount).toBeGreaterThan(0);
 
+    await storeEval(page, () => {
+      const api = window.__pixaCadStore.getState();
+      const obj = api.objects[0];
+      api.selectObject(obj.id);
+      api.setEditMode('face');
+      api.selectFace(0, 'replace');
+      window.__extrudeUndoBaseline = obj.mesh.faceCount;
+      api.startExtrudeSession();
+      api.updateExtrudeDistance(0.5);
+      api.confirmExtrudeSession();
+    });
+    await expect.poll(async () => {
+      return page.evaluate(() => {
+        const baseline = window.__extrudeUndoBaseline;
+        const count = window.__pixaCadStore.getState().objects[0]?.mesh?.faceCount;
+        return count > baseline;
+      });
+    }).toBe(true);
+    await page.getByTestId('app-root').click();
+    await page.keyboard.press('Control+Z');
+    await expect.poll(async () => {
+      return page.evaluate(() => {
+        const baseline = window.__extrudeUndoBaseline;
+        const count = window.__pixaCadStore.getState().objects[0]?.mesh?.faceCount;
+        return count === baseline;
+      });
+    }).toBe(true);
+
     await page.getByTestId('tool-edit-face').click();
     await storeEval(page, () => {
       const api = window.__pixaCadStore.getState();
       const first = api.objects[0];
       if (!first?.mesh) return;
       api.selectObject(first.id);
+      api.setEditMode('face');
       api.selectFace(0, 'replace');
     });
+    await expect.poll(async () => page.evaluate(() => window.__pixaCadStore.getState().editMode)).toBe('face');
     await page.getByTestId('face-color-input').first().fill('#ff0066');
     await expect(page.getByTestId('status-primary')).toContainText('painted');
 

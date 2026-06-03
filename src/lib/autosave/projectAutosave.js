@@ -79,15 +79,16 @@ export async function loadAutosaveProject(id) {
   return entry;
 }
 
-/** @param {() => unknown} getSnapshot @param {number} [intervalMs] */
-export function scheduleAutosave(getSnapshot, intervalMs = 120000) {
+/** @param {() => unknown} getSnapshot @param {number} [intervalMs] @param {(err: unknown) => void} [onError] */
+export function scheduleAutosave(getSnapshot, intervalMs = 120000, onError) {
   if (typeof indexedDB === 'undefined') return () => {};
   const id = 'autosave-current';
   const timer = window.setInterval(async () => {
     try {
       await saveAutosaveProject(id, getSnapshot(), 'Autosave');
-    } catch {
-      /* ignore autosave failures */
+    } catch (err) {
+      console.error('[pixaCAD autosave]', err);
+      onError?.(err);
     }
   }, intervalMs);
   return () => window.clearInterval(timer);

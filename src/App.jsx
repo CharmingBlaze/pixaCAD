@@ -34,7 +34,14 @@ export function App() {
     // Expose store for deterministic end-to-end smoke tests.
     window.__pixaCadStore = useEditorStore;
     window.__khedStore = useEditorStore;
-    const stopAutosave = scheduleAutosave(() => projectSnapshot(useEditorStore.getState()));
+    const stopAutosave = scheduleAutosave(
+      () => projectSnapshot(useEditorStore.getState()),
+      120000,
+      (err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        useEditorStore.getState().setStatus(`Autosave failed: ${message}`);
+      },
+    );
     return () => {
       delete window.__pixaCadStore;
       delete window.__khedStore;

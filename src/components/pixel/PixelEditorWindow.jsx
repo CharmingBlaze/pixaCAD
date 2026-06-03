@@ -86,7 +86,8 @@ export function PixelEditorWindow() {
   const winDragRef = useRef(null);
   const resizeRef = useRef(null);
   const liveUpdateRef = useRef(false);
-  const lastTextureCommitRef = useRef(0);
+  const lastPreviewRef = useRef(0);
+  const pngCommitTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const lastLocalTextureRef = useRef('');
   const suppressNextLayerCommitRef = useRef(false);
   const themeColorsRef = useRef({
@@ -312,7 +313,8 @@ export function PixelEditorWindow() {
     ctx.drawImage(copy, 0, 0);
     ctx.restore();
     renderView();
-    applyTexture(true);
+    previewTexture();
+    schedulePngCommit(true);
   };
 
   const renderView = () => {
@@ -469,7 +471,6 @@ export function PixelEditorWindow() {
     const dataUrl = base.toDataURL('image/png');
     lastLocalTextureRef.current = dataUrl;
     setObjectTextureLayers(object.id, serializeTextureLayers(), dataUrl, { skipHistory });
-    lastTextureCommitRef.current = performance.now();
   };
 
   const applyTextureFromLayers = (layerList, skipHistory = true) => {
@@ -478,7 +479,22 @@ export function PixelEditorWindow() {
     const dataUrl = base.toDataURL('image/png');
     lastLocalTextureRef.current = dataUrl;
     setObjectTextureLayers(object.id, serializeTextureLayers(layerList), dataUrl, { skipHistory });
-    lastTextureCommitRef.current = performance.now();
+  };
+
+  const schedulePngCommit = (skipHistory = true) => {
+    if (pngCommitTimerRef.current) clearTimeout(pngCommitTimerRef.current);
+    pngCommitTimerRef.current = setTimeout(() => {
+      pngCommitTimerRef.current = null;
+      applyTexture(skipHistory);
+    }, 300);
+  };
+
+  const flushPngCommit = (skipHistory = false) => {
+    if (pngCommitTimerRef.current) {
+      clearTimeout(pngCommitTimerRef.current);
+      pngCommitTimerRef.current = null;
+    }
+    applyTexture(skipHistory);
   };
 
   const previewTexture = () => {
@@ -1013,10 +1029,11 @@ export function PixelEditorWindow() {
       liveUpdateRef.current = false;
       renderView();
       const now = performance.now();
-      if (now - lastTextureCommitRef.current >= 32) {
+      if (now - lastPreviewRef.current >= 32) {
         previewTexture();
-        lastTextureCommitRef.current = now;
+        lastPreviewRef.current = now;
       }
+      schedulePngCommit(true);
     });
   };
 
@@ -1047,7 +1064,8 @@ export function PixelEditorWindow() {
     if (tool === 'fill') {
       for (const [mp] of mirroredPixelPairs({ x: p.x, y: p.y })) floodFill(ctx, mp.x, mp.y, rgba);
       renderView();
-      applyTexture(true);
+      previewTexture();
+      schedulePngCommit(true);
       return;
     }
     dragRef.current = {
@@ -1130,7 +1148,7 @@ export function PixelEditorWindow() {
     dragRef.current = null;
     if (drag.kind === 'draw') {
       renderView();
-      applyTexture(false);
+      flushPngCommit(false);
     }
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
@@ -1340,7 +1358,8 @@ export function PixelEditorWindow() {
       suppressNextLayerCommitRef.current = false;
       return;
     }
-    applyTexture(true);
+    previewTexture();
+    schedulePngCommit(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layers]);
 
@@ -1646,7 +1665,7 @@ export function PixelEditorWindow() {
                 <button type="button" onClick={() => object && setObjectTexture(object.id, null)} title="Clear texture">
                   <Trash2 size={13} />
                 </button>
-                <button type="button" className="pixelToolbarPrimary" onClick={() => applyTexture(false)} title="Save texture">
+                <button type="button" className="pixelToolbarPrimary" onClick={() => flushPngCommit(false)} title="Save texture">
                   <Save size={13} />
                 </button>
               </div>

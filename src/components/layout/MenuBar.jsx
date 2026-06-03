@@ -1,8 +1,7 @@
 import { useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore.js';
-import { exportSceneToOBJ, importOBJFiles } from '../../export/obj.js';
-import { exportSceneToGLTF, exportSceneToGLB, importGLTFFiles } from '../../export/gltf.js';
-import { exportSceneToSTL } from '../../export/stl.js';
+import { importOBJFiles } from '../../export/obj.js';
+import { importGLTFFiles } from '../../export/gltf.js';
 import { loadProjectFile, saveProject } from '../../export/project.js';
 import { confirmDiscardChanges } from '../../lib/confirmDiscard.js';
 import { BRAND_NAME, PROJECT_FILE_ACCEPT } from '../../lib/brand.js';
@@ -90,6 +89,7 @@ export function MenuBar() {
   };
   const handleOBJExport = async () => {
     try {
+      const { exportSceneToOBJ } = await import('../../export/obj.js');
       await exportSceneToOBJ(objects);
       setStatus('OBJ exported');
     } catch (err) {
@@ -98,6 +98,7 @@ export function MenuBar() {
   };
   const handleGLTFExport = async () => {
     try {
+      const { exportSceneToGLTF } = await import('../../export/gltf.js');
       await exportSceneToGLTF(objects);
       setStatus('GLTF exported');
     } catch (err) {
@@ -106,6 +107,7 @@ export function MenuBar() {
   };
   const handleGLBExport = async () => {
     try {
+      const { exportSceneToGLB } = await import('../../export/gltf.js');
       await exportSceneToGLB(objects);
       setStatus('GLB exported');
     } catch (err) {
@@ -114,6 +116,7 @@ export function MenuBar() {
   };
   const handleSTLExport = async () => {
     try {
+      const { exportSceneToSTL } = await import('../../export/stl.js');
       await exportSceneToSTL(objects);
       setStatus('STL exported');
     } catch (err) {

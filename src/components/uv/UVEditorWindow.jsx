@@ -504,6 +504,10 @@ export function UVEditorWindow() {
   const [localSelection, setLocalSelection] = useState([]);
   const [image, setImage] = useState(null);
   const [draftUVs, setDraftUVs] = useState({});
+  const draftUVsRef = useRef(draftUVs);
+  useEffect(() => {
+    draftUVsRef.current = draftUVs;
+  }, [draftUVs]);
   const [tool, setTool] = useState('select');
   const [unwrapMode, setUnwrapMode] = useState('smart');
   const [atlasPadding, setAtlasPadding] = useState(0.02);
@@ -634,6 +638,9 @@ export function UVEditorWindow() {
 
   const uvMap = useMemo(() => makeUvMap(mesh, draftUVs), [mesh, draftUVs, meshRevision]);
 
+  const getEffectiveUvMap = () =>
+    makeUvMap(mesh, { ...draftUVsRef.current, ...pendingUvCommitRef.current });
+
   useEffect(() => {
     themeColorsRef.current = uvTheme;
   }, [uvTheme]);
@@ -672,10 +679,13 @@ export function UVEditorWindow() {
     ctx.strokeRect(left, top, uvWidth, uvHeight);
 
     if (!mesh || !showUvLayer) return;
+    const effectiveUvMap = getEffectiveUvMap();
+    const selectionSet = new Set(localSelection);
+    const selectedPointSet = new Set(selectedUvPoints);
     for (let fi = 0; fi < mesh.faceCount; fi++) {
-      const pts = (uvMap[fi] ?? []).map((uv) => [left + uv[0] * uvWidth, top + (1 - uv[1]) * uvHeight]);
+      const pts = (effectiveUvMap[fi] ?? []).map((uv) => [left + uv[0] * uvWidth, top + (1 - uv[1]) * uvHeight]);
       if (pts.length < 2) continue;
-      const selected = localSelection.includes(fi);
+      const selected = selectionSet.has(fi);
       ctx.beginPath();
       pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
       ctx.closePath();
@@ -692,7 +702,7 @@ export function UVEditorWindow() {
         ctx.fillStyle = theme.vertexSelected;
         for (let i = 0; i < pts.length; i++) {
           const p = pts[i];
-          const isSelectedPoint = selectedUvPoints.includes(uvPointKey(fi, i));
+          const isSelectedPoint = selectedPointSet.has(uvPointKey(fi, i));
           ctx.beginPath();
           ctx.arc(p[0], p[1], isSelectedPoint ? 6 : 4, 0, Math.PI * 2);
           ctx.fill();
@@ -809,15 +819,21 @@ export function UVEditorWindow() {
   const flushPendingUVs = ({ skipHistory = false } = {}) => {
     const pending = pendingUvCommitRef.current;
     if (!object || Object.keys(pending).length === 0) return;
-    updateFaceUVs(object.id, copyUvUpdates(pending), { skipHistory });
+    const cleanPending = copyUvUpdates(pending);
+    setDraftUVs((current) => ({ ...current, ...cleanPending }));
+    updateFaceUVs(object.id, cleanPending, { skipHistory });
     pendingUvCommitRef.current = {};
   };
 
   const commitUVs = (next, { persist = true, skipHistory = false } = {}) => {
     const cleanNext = copyUvUpdates(next);
-    setDraftUVs((current) => ({ ...current, ...cleanNext }));
     pendingUvCommitRef.current = { ...pendingUvCommitRef.current, ...cleanNext };
-    if (persist) flushPendingUVs({ skipHistory });
+    if (persist) {
+      setDraftUVs((current) => ({ ...current, ...cleanNext }));
+      flushPendingUVs({ skipHistory });
+    } else {
+      draw();
+    }
   };
 
   const closeUvEditorWithSave = () => {

@@ -131,16 +131,7 @@ export function SceneObject({
   const extrudeActive = useEditorStore((s) => s.extrudeActive);
   const knifeActive = useEditorStore((s) => s.knifeActive);
   const interactiveTransformActive = useEditorStore((s) => s.interactiveTransformActive);
-  const pixelEditorOpen = useEditorStore((s) => s.pixelEditorOpen);
-  const pixelPaintOnModel = useEditorStore((s) => s.pixelPaintOnModel);
-  const pixelTool = useEditorStore((s) => s.pixelTool);
-  const pixelColor = useEditorStore((s) => s.pixelColor);
-  const pixelBrushSize = useEditorStore((s) => s.pixelBrushSize);
-  const pixelOpacity = useEditorStore((s) => s.pixelOpacity);
-  const paintObjectTextureAtUv = useEditorStore((s) => s.paintObjectTextureAtUv);
-  const paintObjectTextureStroke = useEditorStore((s) => s.paintObjectTextureStroke);
-  const paintObjectTextureFace = useEditorStore((s) => s.paintObjectTextureFace);
-  const setPixelPaintTargetId = useEditorStore((s) => s.setPixelPaintTargetId);
+  const paintModeActive = useEditorStore((s) => s.pixelEditorOpen && s.pixelPaintOnModel);
   const isGroup = object.isGroup || !object.mesh;
   const objectLocked = !!object.locked;
 
@@ -423,11 +414,11 @@ export function SceneObject({
     !isGroup &&
     !objectLocked;
 
-  const paint3DActive =
-    pixelEditorOpen &&
-    pixelPaintOnModel &&
-    (pixelTool === 'brush' || pixelTool === 'pencil' || pixelTool === 'eraser' || pixelTool === 'fill') &&
-    hasTexture;
+  const paint3DActive = (() => {
+    if (!paintModeActive || !hasTexture) return false;
+    const tool = useEditorStore.getState().pixelTool;
+    return tool === 'brush' || tool === 'pencil' || tool === 'eraser' || tool === 'fill';
+  })();
   const meshXRay = showXRay && !paint3DActive && !wireMode;
   const xrayOpacity = selected ? 0.72 : 0.42;
   const meshMaterialProps = meshXRay
@@ -446,13 +437,13 @@ export function SceneObject({
     if (!uv || !object.id) return;
     const st = useEditorStore.getState();
     if (st.selectedId !== object.id) st.selectObject(object.id);
-    setPixelPaintTargetId(object.id);
-    paintObjectTextureAtUv(object.id, uv.x, uv.y, {
-      color: pixelColor,
-      brushSize: pixelBrushSize,
-      erase: pixelTool === 'eraser',
-      pixelPerfect: pixelTool === 'pencil',
-      opacity: pixelOpacity,
+    st.setPixelPaintTargetId(object.id);
+    st.paintObjectTextureAtUv(object.id, uv.x, uv.y, {
+      color: st.pixelColor,
+      brushSize: st.pixelBrushSize,
+      erase: st.pixelTool === 'eraser',
+      pixelPerfect: st.pixelTool === 'pencil',
+      opacity: st.pixelOpacity,
     });
     refreshLiveTexture();
     lastPaintUvRef.current = { x: uv.x, y: uv.y };
@@ -463,19 +454,19 @@ export function SceneObject({
     if (!uv || !object.id) return;
     const st = useEditorStore.getState();
     if (st.selectedId !== object.id) st.selectObject(object.id);
-    setPixelPaintTargetId(object.id);
+    st.setPixelPaintTargetId(object.id);
     const options = {
-      color: pixelColor,
-      brushSize: pixelBrushSize,
-      erase: pixelTool === 'eraser',
-      pixelPerfect: pixelTool === 'pencil',
-      opacity: pixelOpacity,
+      color: st.pixelColor,
+      brushSize: st.pixelBrushSize,
+      erase: st.pixelTool === 'eraser',
+      pixelPerfect: st.pixelTool === 'pencil',
+      opacity: st.pixelOpacity,
     };
     const last = lastPaintUvRef.current;
     if (last) {
-      paintObjectTextureStroke(object.id, last.x, last.y, uv.x, uv.y, options);
+      st.paintObjectTextureStroke(object.id, last.x, last.y, uv.x, uv.y, options);
     } else {
-      paintObjectTextureAtUv(object.id, uv.x, uv.y, options);
+      st.paintObjectTextureAtUv(object.id, uv.x, uv.y, options);
     }
     refreshLiveTexture();
     lastPaintUvRef.current = { x: uv.x, y: uv.y };
@@ -489,7 +480,7 @@ export function SceneObject({
             geometry={geometry}
             onPointerMove={(e) => {
               if (!paint3DActive) return;
-              if (pixelTool === 'fill') return;
+              if (useEditorStore.getState().pixelTool === 'fill') return;
               if ((e.buttons & 1) !== 1) return;
               e.stopPropagation();
               paintStrokeToIntersection(e);
@@ -511,14 +502,14 @@ export function SceneObject({
                 const st = useEditorStore.getState();
                 st.pushHistory();
                 if (st.selectedId !== object.id) st.selectObject(object.id);
-                setPixelPaintTargetId(object.id);
-                if (pixelTool === 'fill') {
+                st.setPixelPaintTargetId(object.id);
+                if (st.pixelTool === 'fill') {
                   const fi = triangleToFaceIndex(object.mesh, e.faceIndex ?? -1);
                   if (fi >= 0) {
-                    paintObjectTextureFace(object.id, fi, {
-                      color: pixelColor,
+                    st.paintObjectTextureFace(object.id, fi, {
+                      color: st.pixelColor,
                       erase: false,
-                      opacity: pixelOpacity,
+                      opacity: st.pixelOpacity,
                     });
                     refreshLiveTexture();
                   }

@@ -114,9 +114,8 @@ export class EditableMesh {
     const colors = [];
     const uvs = [];
 
-    const pushTri = (indices, colorHex) => {
+    const pushTri = (indices, faceIndex, colorHex) => {
       const c = new THREE.Color(colorHex);
-      const faceIndex = this.faces.indexOf(indices);
       const faceUVs = this.faceUVs[faceIndex] ?? this.createDefaultFaceUVs(indices, faceIndex);
       for (let i = 1; i < indices.length - 1; i++) {
         const tri = [
@@ -134,7 +133,7 @@ export class EditableMesh {
     };
 
     for (let fi = 0; fi < this.faces.length; fi++) {
-      pushTri(this.faces[fi], this.faceColors[fi] ?? DEFAULT_PAINT_COLOR);
+      pushTri(this.faces[fi], fi, this.faceColors[fi] ?? DEFAULT_PAINT_COLOR);
     }
 
     const geom = new THREE.BufferGeometry();
@@ -143,6 +142,27 @@ export class EditableMesh {
     geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geom.computeVertexNormals();
     return geom;
+  }
+
+  /** @param {THREE.BufferGeometry} geom */
+  updateBufferGeometryPositions(geom) {
+    const posAttr = geom.getAttribute('position');
+    if (!posAttr) return;
+    const arr = posAttr.array;
+    let offset = 0;
+    for (let fi = 0; fi < this.faces.length; fi++) {
+      const indices = this.faces[fi];
+      for (let i = 1; i < indices.length - 1; i++) {
+        for (const vi of [indices[0], indices[i], indices[i + 1]]) {
+          const p = this.getPosition(vi);
+          arr[offset++] = p[0];
+          arr[offset++] = p[1];
+          arr[offset++] = p[2];
+        }
+      }
+    }
+    posAttr.needsUpdate = true;
+    geom.computeVertexNormals();
   }
 
   getEdges() {

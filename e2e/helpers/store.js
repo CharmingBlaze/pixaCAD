@@ -25,6 +25,7 @@ export async function runPolyDrawTriangle(page) {
     store.addPolyDrawPoint([0, 0, 0], 'top');
     store.addPolyDrawPoint([1, 0, 0], 'top');
     store.addPolyDrawPoint([0, 0, 1], 'top');
+    store.finalizePolyDrawSession();
   });
 }
 
