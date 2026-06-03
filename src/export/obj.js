@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BRAND_NAME } from '../lib/brand.js';
 import { EditableMesh } from '../lib/mesh/EditableMesh.js';
+import { evaluateObjectMesh } from '../lib/mesh/modifiers.js';
 import { uid } from '../lib/id.js';
 import { dataUrlToBlob, readFileDataUrl, readFileText, safeName, saveFiles } from './fileSave.js';
 
@@ -45,7 +46,7 @@ export async function exportSceneToOBJ(objects) {
   const textureNames = new Map();
 
   for (const obj of meshes) {
-    const mesh = obj.mesh;
+    const mesh = evaluateObjectMesh(obj);
     if (!mesh) continue;
     const objName = safeName(obj.name, 'Object');
     const materialName = `${objName}_mat`;

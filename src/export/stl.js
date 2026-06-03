@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
+import { evaluateObjectMesh } from '../lib/mesh/modifiers.js';
 import { saveBlob } from './fileSave.js';
 
 function exportableMeshes(objects) {
@@ -14,8 +15,10 @@ export async function exportSceneToSTL(objects) {
   }
   const scene = new THREE.Scene();
   for (const obj of meshes) {
-    const geometry = obj.mesh.toBufferGeometry();
-    const material = new THREE.MeshStandardMaterial({ color: obj.mesh.faceColors[0] ?? '#c8b070' });
+    const evaluatedMesh = evaluateObjectMesh(obj);
+    if (!evaluatedMesh) continue;
+    const geometry = evaluatedMesh.toBufferGeometry();
+    const material = new THREE.MeshStandardMaterial({ color: evaluatedMesh.faceColors[0] ?? '#c8b070' });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.fromArray(obj.position);
     mesh.rotation.set(...obj.rotation);

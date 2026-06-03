@@ -10,6 +10,7 @@ import { canViewportPickObject } from '../../store/interaction.js';
 import { selectModeFromEvent } from '../../store/selection.js';
 import { objectSnapGrid, snapVector3Components } from '../../lib/snap/gridSnap.js';
 import { verticesFromEdgeKeys, verticesFromFaceIndices } from '../../lib/mesh/edgeKeys.js';
+import { evaluateObjectMesh } from '../../lib/mesh/modifiers.js';
 import { SubObjectOverlay } from './SubObjectOverlay.jsx';
 import { VertexTransformControls } from './VertexTransformControls.jsx';
 import { useViewportTheme } from '../../hooks/useViewportTheme.js';
@@ -48,6 +49,64 @@ function syncObjectTransform(group, object) {
   group.position.fromArray(object.position);
   group.rotation.set(object.rotation[0], object.rotation[1], object.rotation[2]);
   group.scale.fromArray(object.scale);
+}
+
+function FaceNormalsOverlay({ mesh, selected }) {
+  const geometry = useMemo(() => {
+    if (!mesh || mesh.faceCount === 0) return null;
+    const positions = [];
+    const colors = [];
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+
+    for (let i = 0; i < mesh.vertexCount; i++) {
+      const p = mesh.getPosition(i);
+      minX = Math.min(minX, p[0]);
+      minY = Math.min(minY, p[1]);
+      minZ = Math.min(minZ, p[2]);
+      maxX = Math.max(maxX, p[0]);
+      maxY = Math.max(maxY, p[1]);
+      maxZ = Math.max(maxZ, p[2]);
+    }
+
+    const diagonal = Math.hypot(maxX - minX, maxY - minY, maxZ - minZ);
+    const length = Math.max(0.08, diagonal * 0.12);
+    const outwardColor = selected ? [0.25, 0.85, 1] : [0.1, 0.65, 1];
+    const inwardColor = [1, 0.18, 0.1];
+
+    for (let fi = 0; fi < mesh.faceCount; fi++) {
+      const face = mesh.faces[fi];
+      if (!face || face.length < 3) continue;
+      const center = mesh.getFaceCenter(fi);
+      const normal = mesh.getFaceNormal(fi);
+      const end = [
+        center[0] + normal.x * length,
+        center[1] + normal.y * length,
+        center[2] + normal.z * length,
+      ];
+      const color = mesh.shouldReverseFaceWinding(fi) ? inwardColor : outwardColor;
+      positions.push(...center, ...end);
+      colors.push(...color, ...color);
+    }
+
+    const normalGeometry = new THREE.BufferGeometry();
+    normalGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    normalGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    return normalGeometry;
+  }, [mesh, selected]);
+
+  useEffect(() => () => geometry?.dispose(), [geometry]);
+  if (!geometry) return null;
+
+  return (
+    <lineSegments geometry={geometry} renderOrder={5} raycast={() => null}>
+      <lineBasicMaterial vertexColors transparent opacity={0.95} depthTest={false} depthWrite={false} toneMapped={false} />
+    </lineSegments>
+  );
 }
 
 /**
@@ -115,6 +174,7 @@ export function SceneObject({
   const { camera, gl, invalidate } = useThree();
   const groupRef = useRef(/** @type {THREE.Group | null} */ (null));
   const objectDragRef = useRef(null);
+  const skipClickSelectRef = useRef(false);
   const selectedId = useEditorStore((s) => s.selectedId);
   const selected = useEditorStore((s) => isObjectSelected(s, object.id));
   const editMode = useEditorStore((s) => s.editMode);
@@ -123,7 +183,9 @@ export function SceneObject({
   const selectedEdges = useEditorStore((s) => s.selectedEdges);
   const selectedFaces = useEditorStore((s) => s.selectedFaces);
   const meshRevision = useEditorStore((s) => s.meshRevision);
+  const interactiveMeshTick = useEditorStore((s) => s.interactiveMeshTick);
   const showWireframe = useEditorStore((s) => s.showWireframe);
+  const showNormals = useEditorStore((s) => s.showNormals);
   const showXRay = useEditorStore((s) => s.showXRay);
   const selectObject = useEditorStore((s) => s.selectObject);
   const updateObject = useEditorStore((s) => s.updateObject);
@@ -142,6 +204,11 @@ export function SceneObject({
 
   const geometry = useDisposableMeshGeometry(object);
   const outlineGeometry = useDisposableMeshOutlineGeometry(object);
+  const hasLiveModifiers = !!(object.meshModifiers?.mirrorEnabled || object.meshModifiers?.subdivisionLevel);
+  const displayMesh = useMemo(
+    () => evaluateObjectMesh(object),
+    [object.mesh, object.meshModifiers, meshRevision, hasLiveModifiers ? interactiveMeshTick : 0],
+  );
   const textureRef = useRef(/** @type {THREE.Texture | null} */ (null));
   const [texture, setTexture] = useState(/** @type {THREE.Texture | null} */ (null));
   const lastPaintUvRef = useRef(null);
@@ -272,8 +339,6 @@ export function SceneObject({
     }
 
     e.nativeEvent.__khedObjectHit = true;
-    if (!isObjectSelected(st, object.id)) selectObject(object.id);
-
     if (objectLocked || st.transformMode !== 'translate') {
       return;
     }
@@ -308,6 +373,7 @@ export function SceneObject({
         downX,
         downY,
         started: false,
+        selectMode: selectModeFromEvent(e.nativeEvent),
         plane,
         startHit,
         startPos,
@@ -332,7 +398,14 @@ export function SceneObject({
 
       if (!drag.started) {
         drag.started = true;
-        const state = useEditorStore.getState();
+        let state = useEditorStore.getState();
+        if (!isObjectSelected(state, object.id)) {
+          const mode = drag.selectMode ?? 'replace';
+          if (mode === 'replace') selectObject(object.id);
+          else if (mode === 'add') selectObject(object.id, { additive: true });
+          else selectObject(object.id, { remove: true });
+          state = useEditorStore.getState();
+        }
         state.pushHistory();
         const ids = resolveInteractiveObjectIds(state.objects, coalesceSelectedIds(state));
         /** @type {Record<string, [number, number, number]>} */
@@ -385,6 +458,7 @@ export function SceneObject({
 
       const drag = objectDragRef.current;
       if (drag?.started) {
+        skipClickSelectRef.current = true;
         const count = drag.selectedIds?.length ?? 1;
         useEditorStore.getState().setStatus(count > 1 ? 'Selection moved' : 'Object moved');
       }
@@ -546,6 +620,10 @@ export function SceneObject({
             }}
             onClick={(e) => {
               if (paint3DActive) return;
+              if (skipClickSelectRef.current) {
+                skipClickSelectRef.current = false;
+                return;
+              }
               const st = useEditorStore.getState();
               if (st.editMode !== 'object' && st.selectedId === object.id) return;
               pickObjectFromViewport(e);
@@ -604,6 +682,7 @@ export function SceneObject({
               />
             </lineSegments>
           )}
+          {showNormals && <FaceNormalsOverlay mesh={displayMesh} selected={selected} />}
         </>
       )}
 
@@ -613,6 +692,10 @@ export function SceneObject({
           selected={selected}
           onClick={(e) => {
             if (paint3DActive) return;
+            if (skipClickSelectRef.current) {
+              skipClickSelectRef.current = false;
+              return;
+            }
             pickObjectFromViewport(e);
           }}
         />

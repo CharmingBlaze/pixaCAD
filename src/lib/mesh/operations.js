@@ -131,6 +131,7 @@ export function extrudeFaces(mesh, faceIndices, distance = 0.5) {
     next.faceColors.push(color);
   }
 
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -170,6 +171,7 @@ export function extrudeFacesIndividually(mesh, faceIndices, distance = 0.5) {
     }
     next.faces[fi] = capVerts;
   }
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -207,6 +209,7 @@ export function extrudeEdges(mesh, edgeKeys, color = DEFAULT_PAINT_COLOR) {
     newEdgeKeys.push(keyForEdge(newA, newB));
   }
 
+  next.normalizeFaceWinding();
   return { mesh: next, edgeKeys: newEdgeKeys };
 }
 
@@ -326,6 +329,7 @@ export function knifeCutFace(mesh, faceIndex, localA, localB) {
   next.faceColors[faceIndex] = color;
   next.faces.push(faceB);
   next.faceColors.push(color);
+  next.normalizeFaceWinding();
 
   return { mesh: next, cut: true, faceIndices: [faceIndex, next.faces.length - 1] };
 }
@@ -475,6 +479,7 @@ export function bevelEdges(mesh, edgeKeys, amount = 0.18, color = DEFAULT_PAINT_
 
   next.faces = newFaces;
   next.faceColors = newColors;
+  next.normalizeFaceWinding();
   return { mesh: next, faceIndices: newFaceIndices, edgeKeys: [...new Set(resultEdgeKeys)] };
 }
 
@@ -525,6 +530,7 @@ export function weldVertices(mesh, threshold = 0.08) {
 
   next.positions = newPositions;
   next.faces = next.faces.map((face) => face.map((vi) => indexMap[vi]));
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -620,21 +626,28 @@ export function subdivideFaces(mesh, faceIndices = null) {
 
   const newFaces = [];
   const newColors = [];
+  const newFaceUVs = [];
 
   for (let fi = 0; fi < next.faces.length; fi++) {
     const face = next.faces[fi];
     const color = next.faceColors[fi];
+    const uvs = next.faceUVs[fi] ?? face.map(() => [0, 0]);
     if (selected && !selected.has(fi)) {
       newFaces.push(face);
       newColors.push(color);
+      newFaceUVs.push(uvs.map(([u, v]) => [u, v]));
       continue;
     }
     if (face.length === 3) {
       const m01 = getMid(face[0], face[1]);
       const m12 = getMid(face[1], face[2]);
       const m20 = getMid(face[2], face[0]);
+      const uv01 = averageUv(uvs[0], uvs[1]);
+      const uv12 = averageUv(uvs[1], uvs[2]);
+      const uv20 = averageUv(uvs[2], uvs[0]);
       newFaces.push([face[0], m01, m20], [m01, face[1], m12], [m20, m12, face[2]], [m01, m12, m20]);
       newColors.push(color, color, color, color);
+      newFaceUVs.push([uvs[0], uv01, uv20], [uv01, uvs[1], uv12], [uv20, uv12, uvs[2]], [uv01, uv12, uv20]);
     } else if (face.length === 4) {
       const m01 = getMid(face[0], face[1]);
       const m12 = getMid(face[1], face[2]);
@@ -643,6 +656,11 @@ export function subdivideFaces(mesh, faceIndices = null) {
       const center = next.vertexCount;
       const c = next.getFaceCenter(fi);
       next.positions.push(c[0], c[1], c[2]);
+      const uv01 = averageUv(uvs[0], uvs[1]);
+      const uv12 = averageUv(uvs[1], uvs[2]);
+      const uv23 = averageUv(uvs[2], uvs[3]);
+      const uv30 = averageUv(uvs[3], uvs[0]);
+      const uvCenter = averageUv(averageUv(uvs[0], uvs[2]), averageUv(uvs[1], uvs[3]));
       newFaces.push(
         [face[0], m01, center, m30],
         [m01, face[1], m12, center],
@@ -650,23 +668,35 @@ export function subdivideFaces(mesh, faceIndices = null) {
         [m30, center, m23, face[3]],
       );
       newColors.push(color, color, color, color);
+      newFaceUVs.push(
+        [uvs[0], uv01, uvCenter, uv30],
+        [uv01, uvs[1], uv12, uvCenter],
+        [uvCenter, uv12, uvs[2], uv23],
+        [uv30, uvCenter, uv23, uvs[3]],
+      );
     } else {
       const center = next.vertexCount;
       const c = next.getFaceCenter(fi);
       next.positions.push(c[0], c[1], c[2]);
+      const uvCenter = uvs.reduce((sum, uv) => [sum[0] + uv[0], sum[1] + uv[1]], [0, 0]).map((value) => value / Math.max(1, uvs.length));
       for (let i = 0; i < face.length; i++) {
         const a = face[i];
         const b = face[(i + 1) % face.length];
         const mid = getMid(a, b);
         const prevMid = getMid(face[(i - 1 + face.length) % face.length], a);
+        const uvMid = averageUv(uvs[i], uvs[(i + 1) % face.length]);
+        const uvPrevMid = averageUv(uvs[(i - 1 + face.length) % face.length], uvs[i]);
         newFaces.push([a, mid, center, prevMid]);
         newColors.push(color);
+        newFaceUVs.push([uvs[i], uvMid, uvCenter, uvPrevMid]);
       }
     }
   }
 
   next.faces = newFaces;
   next.faceColors = newColors;
+  next.faceUVs = newFaceUVs.map((uvsForFace) => uvsForFace.map(([u, v]) => [u, v]));
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -723,6 +753,7 @@ export function flipMeshAcrossAxis(mesh, axis = 'x', vertexIndices = null) {
     if (next.faceUVs[fi]) next.faceUVs[fi] = [...next.faceUVs[fi]].reverse();
   }
 
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -730,7 +761,9 @@ export function flipMeshAcrossAxis(mesh, axis = 'x', vertexIndices = null) {
 export function flipFaceNormals(mesh, faceIndices) {
   const next = mesh.clone();
   for (const fi of faceIndices) {
-    if (next.faces[fi]) next.faces[fi] = [...next.faces[fi]].reverse();
+    if (!next.faces[fi]) continue;
+    next.faces[fi] = [...next.faces[fi]].reverse();
+    if (next.faceUVs[fi]) next.faceUVs[fi] = [...next.faceUVs[fi]].reverse();
   }
   return next;
 }
@@ -803,6 +836,7 @@ export function removeVertices(mesh, vertexIndices) {
   }
   next.faces = newFaces;
   next.faceColors = newColors;
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -1052,6 +1086,7 @@ export function addFace(mesh, indices, color) {
   const next = mesh.clone();
   next.faces.push(face);
   next.faceColors.push(color ?? DEFAULT_PAINT_COLOR);
+  next.normalizeFaceWinding();
   return next;
 }
 
@@ -1133,6 +1168,7 @@ export function insetFaces(mesh, faceIndices, amount = 0.25) {
     next.faces[fi] = capVerts;
     next.faceUVs[fi] = capVerts.map((_, i) => uvs[i] ?? [0, 0]);
   }
+  next.normalizeFaceWinding();
   return next;
 }
 

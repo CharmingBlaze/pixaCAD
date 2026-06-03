@@ -20,6 +20,7 @@ export function StatusBar() {
   const editMode = useEditorStore((s) => s.editMode);
   const activeTool = useEditorStore((s) => s.activeTool);
   const showWireframe = useEditorStore((s) => s.showWireframe);
+  const showNormals = useEditorStore((s) => s.showNormals);
   const showXRay = useEditorStore((s) => s.showXRay);
   const renderMode = useEditorStore((s) => s.renderMode);
   const viewportLayoutMode = useEditorStore((s) => s.viewportLayoutMode);
@@ -34,6 +35,7 @@ export function StatusBar() {
   const extrudeDistance = useEditorStore((s) => s.extrudeDistance);
   const selectionSummary = useEditorStore((s) => getSelectionSummary(s));
   const toggleWireframe = useEditorStore((s) => s.toggleWireframe);
+  const toggleNormals = useEditorStore((s) => s.toggleNormals);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
   const setGridSize = useEditorStore((s) => s.setGridSize);
   const centerActiveViewport = useEditorStore((s) => s.centerActiveViewport);
@@ -66,6 +68,14 @@ export function StatusBar() {
           title="Toggle wireframe overlay (W)"
         >
           Wireframe
+        </button>
+        <button
+          type="button"
+          className={showNormals ? 'statusToggle active' : 'statusToggle'}
+          onClick={toggleNormals}
+          title="Show face normals in all viewports"
+        >
+          Normals
         </button>
         <button
           type="button"
@@ -126,6 +136,7 @@ export function StatusBar() {
         {canUndo ? 'Undo ' : ''}
         {canRedo ? 'Redo ' : ''}
         {showWireframe ? 'Wire · ' : ''}
+        {showNormals ? 'Normals · ' : ''}
         {showXRay ? 'X-Ray · ' : ''}
         {snapGrid ? `Snap ${gridSize}` : 'Free'} · {viewportLayoutMode}
       </span>

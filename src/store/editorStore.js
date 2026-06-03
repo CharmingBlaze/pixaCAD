@@ -98,6 +98,7 @@ import {
   polyDrawSessionEndState,
 } from './toolState.js';
 import { readStoredThemeId, persistThemeId, themeLabel } from '../lib/themes.js';
+import { evaluateObjectMesh } from '../lib/mesh/modifiers.js';
 
 /** @typedef {'object' | 'vertex' | 'edge' | 'face'} EditMode */
 /** @typedef {'translate' | 'rotate' | 'scale'} TransformMode */
@@ -132,6 +133,7 @@ import { readStoredThemeId, persistThemeId, themeLabel } from '../lib/themes.js'
  * @property {string | null} textureDataUrl
  * @property {{ id: string, name: string, visible: boolean, opacity: number, kind?: string, dataUrl: string | null }[]} textureLayers
  * @property {number} textureRevision
+ * @property {{ mirrorEnabled?: boolean, mirrorAxis?: 'x' | 'y' | 'z', subdivisionLevel?: number }} meshModifiers
  * @property {boolean} visible
  * @property {boolean} locked
  */
@@ -536,6 +538,7 @@ export const useEditorStore = create((set, get) => ({
   hoveredEdge: null,
   paintColor: DEFAULT_PAINT_COLOR,
   showWireframe: true,
+  showNormals: false,
   showXRay: false,
   showGrid: true,
   renderMode: /** @type {RenderMode} */ ('textured'),
@@ -731,6 +734,7 @@ export const useEditorStore = create((set, get) => ({
       weldThreshold: projectState.weldThreshold ?? 0.08,
       snapToMeshFeatures: !!projectState.snapToMeshFeatures,
       showWireframe: !!projectState.showWireframe,
+      showNormals: !!projectState.showNormals,
       showXRay: !!projectState.showXRay,
       showGrid: projectState.showGrid !== false,
       activeViewport: projectState.activeViewport ?? 'perspective',
@@ -752,17 +756,21 @@ export const useEditorStore = create((set, get) => ({
       set({ statusMessage: 'No objects found in import' });
       return;
     }
+    const importedObjects = sceneObjects.map((object) => ({
+      ...object,
+      meshModifiers: object.meshModifiers ?? { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
+    }));
     get().pushHistory();
     set((s) => ({
-      objects: [...s.objects, ...sceneObjects],
-      selectedId: sceneObjects[0].id,
-      selectedIds: [sceneObjects[0].id],
+      objects: [...s.objects, ...importedObjects],
+      selectedId: importedObjects[0].id,
+      selectedIds: [importedObjects[0].id],
       editMode: 'object',
       selectedVertices: [],
       selectedEdges: [],
       selectedFaces: [],
       meshRevision: s.meshRevision + 1,
-      statusMessage: `Imported ${sceneObjects.length} object(s)`,
+      statusMessage: `Imported ${importedObjects.length} object(s)`,
     }));
   },
 
@@ -1648,6 +1656,7 @@ export const useEditorStore = create((set, get) => ({
           textureDataUrl: null,
           textureLayers: [],
           textureRevision: 0,
+          meshModifiers: { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
           visible: true,
           locked: false,
         },
@@ -1894,6 +1903,7 @@ export const useEditorStore = create((set, get) => ({
       textureDataUrl: null,
       textureLayers: [],
       textureRevision: 0,
+      meshModifiers: { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
       visible: true,
       locked: false,
     };
@@ -1931,6 +1941,7 @@ export const useEditorStore = create((set, get) => ({
       textureDataUrl: null,
       textureLayers: [],
       textureRevision: 0,
+      meshModifiers: { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
       visible: true,
       locked: false,
     };
@@ -1961,6 +1972,7 @@ export const useEditorStore = create((set, get) => ({
       textureDataUrl: null,
       textureLayers: [],
       textureRevision: 0,
+      meshModifiers: { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
       visible: true,
       locked: false,
     };
@@ -2207,6 +2219,30 @@ export const useEditorStore = create((set, get) => ({
     });
   },
 
+  applyObjectModifiers: (id) => {
+    const obj = get().objects.find((o) => o.id === id);
+    if (!obj?.mesh || obj.locked) return;
+    const evaluated = evaluateObjectMesh(obj);
+    if (!evaluated || evaluated === obj.mesh) {
+      set({ statusMessage: 'No modifiers to apply' });
+      return;
+    }
+    get().pushHistory();
+    set((s) => ({
+      objects: s.objects.map((o) =>
+        o.id === id
+          ? {
+              ...o,
+              mesh: evaluated.clone(),
+              meshModifiers: { mirrorEnabled: false, mirrorAxis: o.meshModifiers?.mirrorAxis ?? 'x', subdivisionLevel: 0 },
+            }
+          : o,
+      ),
+      meshRevision: s.meshRevision + 1,
+      statusMessage: 'Modifiers applied',
+    }));
+  },
+
   removeSelected: () => {
     const { objects } = get();
     const ids = coalesceSelectedIds(get());
@@ -2275,6 +2311,7 @@ export const useEditorStore = create((set, get) => ({
         position: [src.position[0] + 0.5, src.position[1], src.position[2] + 0.5],
         textureLayers: src.textureLayers?.map((layer) => ({ ...layer })) ?? [],
         textureRevision: 0,
+        meshModifiers: src.meshModifiers ? { ...src.meshModifiers } : { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
         locked: false,
       };
       set((s) => ({
@@ -2345,6 +2382,11 @@ export const useEditorStore = create((set, get) => ({
   setGizmoInteracting: (gizmoInteracting) => set({ gizmoInteracting }),
 
   toggleWireframe: () => set((s) => ({ showWireframe: !s.showWireframe })),
+  toggleNormals: () =>
+    set((s) => ({
+      showNormals: !s.showNormals,
+      statusMessage: !s.showNormals ? 'Normals visible' : 'Normals hidden',
+    })),
   toggleXRay: () =>
     set((s) => ({
       showXRay: !s.showXRay,
@@ -3084,6 +3126,7 @@ export const useEditorStore = create((set, get) => ({
       id: uid(),
       name: `${obj.name}_mirror_${axis.toUpperCase()}`,
       mesh: obj.mesh ? flipMeshAcrossAxis(obj.mesh, axis, null) : null,
+      meshModifiers: obj.meshModifiers ? { ...obj.meshModifiers } : { mirrorEnabled: false, mirrorAxis: 'x', subdivisionLevel: 0 },
       position: obj.position.map((v, i) => (i === axisIdx ? -v : v)),
       locked: false,
     };

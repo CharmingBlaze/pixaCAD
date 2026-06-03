@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { buildMeshOutlineGeometry } from '../lib/mesh/faceGeometry.js';
+import { evaluateObjectMesh } from '../lib/mesh/modifiers.js';
 
 /**
  * Buffer geometry for a scene object mesh; updates when mesh data or global revision changes.
@@ -10,16 +11,19 @@ import { buildMeshOutlineGeometry } from '../lib/mesh/faceGeometry.js';
 export function useMeshGeometry(object) {
   const meshRevision = useEditorStore((s) => s.meshRevision);
   const interactiveMeshTick = useEditorStore((s) => s.interactiveMeshTick);
+  const hasLiveModifiers = !!(object?.meshModifiers?.mirrorEnabled || object?.meshModifiers?.subdivisionLevel);
+  const modifierTick = hasLiveModifiers ? interactiveMeshTick : 0;
 
   const geometry = useMemo(() => {
-    if (!object?.mesh) return null;
-    return object.mesh.toBufferGeometry();
-  }, [object?.mesh, object?.id, meshRevision]);
+    const mesh = object ? evaluateObjectMesh(object) : null;
+    if (!mesh) return null;
+    return mesh.toBufferGeometry();
+  }, [object?.mesh, object?.meshModifiers, object?.id, meshRevision, modifierTick]);
 
   useEffect(() => {
-    if (!object?.mesh || !geometry || interactiveMeshTick === 0) return;
+    if (!object?.mesh || hasLiveModifiers || !geometry || interactiveMeshTick === 0) return;
     object.mesh.updateBufferGeometryPositions(geometry);
-  }, [interactiveMeshTick, object?.mesh, object?.id, geometry]);
+  }, [interactiveMeshTick, hasLiveModifiers, object?.mesh, object?.meshModifiers, object?.id, geometry]);
 
   return geometry;
 }
@@ -47,14 +51,17 @@ export function useDisposableMeshGeometry(object) {
 export function useMeshOutlineGeometry(object) {
   const meshRevision = useEditorStore((s) => s.meshRevision);
   const interactiveMeshTick = useEditorStore((s) => s.interactiveMeshTick);
+  const hasLiveModifiers = !!(object?.meshModifiers?.mirrorEnabled || object?.meshModifiers?.subdivisionLevel);
+  const modifierTick = hasLiveModifiers ? interactiveMeshTick : 0;
 
   const geometry = useMemo(() => {
-    if (!object?.mesh) return null;
-    return buildMeshOutlineGeometry(object.mesh);
-  }, [object?.mesh, object?.id, meshRevision]);
+    const mesh = object ? evaluateObjectMesh(object) : null;
+    if (!mesh) return null;
+    return buildMeshOutlineGeometry(mesh);
+  }, [object?.mesh, object?.meshModifiers, object?.id, meshRevision, modifierTick]);
 
   useEffect(() => {
-    if (!object?.mesh || !geometry || interactiveMeshTick === 0) return;
+    if (!object?.mesh || hasLiveModifiers || !geometry || interactiveMeshTick === 0) return;
     const posAttr = geometry.getAttribute('position');
     if (!posAttr) return;
     const arr = posAttr.array;
@@ -70,7 +77,7 @@ export function useMeshOutlineGeometry(object) {
       }
     }
     posAttr.needsUpdate = true;
-  }, [interactiveMeshTick, object?.mesh, object?.id, geometry]);
+  }, [interactiveMeshTick, hasLiveModifiers, object?.mesh, object?.meshModifiers, object?.id, geometry]);
 
   return geometry;
 }

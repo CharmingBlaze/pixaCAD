@@ -1,17 +1,15 @@
 import { useEditorStore } from '../../store/editorStore.js';
 import { getSelectionSummary } from '../../store/selection.js';
-import { FaceColorControls } from './FaceColorControls.jsx';
 import {
   buildBoxFromDraw,
   boxMetrics,
   formatDrawSize,
 } from '../../lib/draw/cadDraw.js';
+import { evaluateObjectMesh, normalizeMeshModifiers } from '../../lib/mesh/modifiers.js';
 
 export function PropertiesPanel() {
   const selected = useEditorStore((s) => s.objects.find((o) => o.id === s.selectedId) ?? null);
-  const selectedVertices = useEditorStore((s) => s.selectedVertices);
   const selectedEdges = useEditorStore((s) => s.selectedEdges);
-  const selectedFaces = useEditorStore((s) => s.selectedFaces);
   const editMode = useEditorStore((s) => s.editMode);
   const removeSelected = useEditorStore((s) => s.removeSelected);
   const deleteSubSelection = useEditorStore((s) => s.deleteSubSelection);
@@ -19,6 +17,7 @@ export function PropertiesPanel() {
   const bevelSelectedEdges = useEditorStore((s) => s.bevelSelectedEdges);
   const selectionSummary = useEditorStore((s) => getSelectionSummary(s));
   const updateObject = useEditorStore((s) => s.updateObject);
+  const applyObjectModifiers = useEditorStore((s) => s.applyObjectModifiers);
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
   const undo = useEditorStore((s) => s.undo);
@@ -51,11 +50,11 @@ export function PropertiesPanel() {
     const { min, max } = buildBoxFromDraw(drawStart, drawCorner2, h, drawViewId);
     drawSizeLabel = formatDrawSize(boxMetrics(min, max).size);
   }
+  const meshModifiers = normalizeMeshModifiers(selected?.meshModifiers);
+  const evaluatedMesh = selected?.mesh ? evaluateObjectMesh(selected) : null;
 
   return (
-    <aside className="propsPanel">
-      <h2>Properties</h2>
-
+    <>
       {(pendingPrimitive || polyDrawActive || extrudeActive || loopCutActive || bevelActive || knifeActive) && (
         <div className="propBlock">
           <h3>Active tool</h3>
@@ -124,13 +123,6 @@ export function PropertiesPanel() {
             ))}
           </div>
 
-          {editMode === 'face' && !selected.isGroup && (
-            <div className="propBlock">
-              <h3>Face color</h3>
-              <FaceColorControls showPalette={false} showHint />
-            </div>
-          )}
-
           <div className="propBlock">
             <h3>Selection</h3>
             <p className="panelHint selectionSummary">{selectionSummary}</p>
@@ -176,6 +168,76 @@ export function PropertiesPanel() {
             </label>
           </div>
 
+          {!selected.isGroup && selected.mesh && (
+            <div className="propBlock">
+              <h3>Modifiers</h3>
+              <label className="propCheck">
+                <input
+                  type="checkbox"
+                  checked={meshModifiers.mirrorEnabled}
+                  disabled={selected.locked}
+                  onChange={(e) =>
+                    updateObject(selected.id, {
+                      meshModifiers: { ...meshModifiers, mirrorEnabled: e.target.checked },
+                    })
+                  }
+                />
+                Live mirror
+              </label>
+              <label>
+                Mirror axis
+                <select
+                  value={meshModifiers.mirrorAxis}
+                  disabled={selected.locked || !meshModifiers.mirrorEnabled}
+                  onChange={(e) =>
+                    updateObject(selected.id, {
+                      meshModifiers: { ...meshModifiers, mirrorAxis: e.target.value },
+                    })
+                  }
+                >
+                  <option value="x">X</option>
+                  <option value="y">Y</option>
+                  <option value="z">Z</option>
+                </select>
+              </label>
+              <label>
+                Subdivision
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="1"
+                  value={meshModifiers.subdivisionLevel}
+                  disabled={selected.locked}
+                  onChange={(e) =>
+                    updateObject(selected.id, {
+                      meshModifiers: {
+                        ...meshModifiers,
+                        subdivisionLevel: Number(e.target.value) >= 1 ? 1 : 0,
+                      },
+                    })
+                  }
+                />
+              </label>
+              <p className="panelHint selectionSummary">
+                Base {selected.mesh.vertexCount}v · {selected.mesh.faceCount}f · Preview {evaluatedMesh?.vertexCount ?? selected.mesh.vertexCount}v · {evaluatedMesh?.faceCount ?? selected.mesh.faceCount}f
+              </p>
+              <div className="propBtnRow">
+                <button
+                  type="button"
+                  className="toolBtn compact"
+                  disabled={
+                    selected.locked ||
+                    (!meshModifiers.mirrorEnabled && meshModifiers.subdivisionLevel <= 0)
+                  }
+                  onClick={() => applyObjectModifiers(selected.id)}
+                >
+                  Apply modifiers
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="propBlock propBtnRow">
             <button type="button" disabled={!canUndo} onClick={undo}>
               Undo
@@ -191,6 +253,6 @@ export function PropertiesPanel() {
         </>
       )}
 
-    </aside>
+    </>
   );
 }

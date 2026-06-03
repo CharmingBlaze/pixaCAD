@@ -454,7 +454,7 @@ button {
 /* Workspace */
 .khedWorkspace {
   display: grid;
-  grid-template-columns: 168px 1fr 168px;
+  grid-template-columns: 168px 1fr 232px;
   flex: 1;
   min-height: 0;
   background: var(--t-panel-bg);
@@ -475,11 +475,26 @@ button {
 }
 
 .khedRight .materialPanel,
-.khedRight .propsPanel {
+.khedRight .propsPanel,
+.khedRight .inspectorTabPane {
   padding: 6px;
 }
 
+.khedRight .inspectorPanel {
+  padding: 0;
+}
+
+.khedRight .inspectorTabs {
+  padding: 0 6px;
+}
+
+.khedRight .inspectorTab {
+  font-size: 9px;
+  padding: 5px 8px;
+}
+
 .khedRight .scenePanel h2,
+.khedRight .inspectorTab h2,
 .khedRight .materialPanel h2,
 .khedRight .propsPanel h2 {
   font-size: 10px;
@@ -548,7 +563,18 @@ button {
 }
 
 .khedRight .vecRow {
-  gap: 3px;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.khedRight .vecRow input[type='number'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .khedRight .propMeta {
@@ -1506,23 +1532,78 @@ button {
   opacity: 0.72;
 }
 
-/* Properties */
-.materialPanel {
-  flex: 0 1 auto;
-  max-height: min(52vh, 430px);
-  min-height: 0;
-  overflow-y: auto;
-  border-bottom: 1px solid var(--t-border);
+/* Object inspector (Properties + Material tabs) */
+.inspectorPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 180px;
+  min-width: 0;
+  overflow: hidden;
   background: var(--t-panel-bg);
+  border-top: 1px solid var(--t-border-muted);
+}
+
+.inspectorTabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--t-border);
+  background: var(--t-panel-grad, var(--t-panel-bg));
+}
+
+.inspectorTab {
+  position: relative;
+  margin: 0;
+  padding: 7px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--t-muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.inspectorTab:hover {
+  color: var(--t-body-text, var(--t-tool-text));
+}
+
+.inspectorTab.active {
+  color: var(--t-accent);
+  border-bottom-color: var(--t-accent);
+}
+
+.inspectorTabPanels {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.inspectorTabPane {
+  height: 100%;
+  overflow-y: auto;
   padding: 8px;
+  background: var(--t-panel-bg);
+}
+
+.inspectorTabPane .propBlock:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Properties / Material content */
+.materialPanel {
+  height: 100%;
 }
 
 .propsPanel {
-  flex: 1;
-  min-height: 180px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--t-panel-bg);
+  height: 100%;
 }
 
 .propsPanel h3 {
@@ -1559,8 +1640,19 @@ button {
 
 .vecRow {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.vecRow input[type='number'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+  height: 24px;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .propMeta {

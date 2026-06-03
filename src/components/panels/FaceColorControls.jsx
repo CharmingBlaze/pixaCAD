@@ -90,13 +90,11 @@ export function FaceColorControls({ showPalette = true, showHint = false }) {
           onChange={(e) => applyColor(e.target.value)}
         />
       </label>
-      {showHint && (
+      {showHint && faceMode && (
         <p className="panelHint">
           {hasFaceSelection
             ? 'Colors apply to selected faces immediately.'
-            : faceMode
-              ? 'Select one or more faces, then pick a color (or Shift+F).'
-              : 'In Face mode, colors apply to selected faces only.'}
+            : 'Select one or more faces, then pick a color (or Shift+F).'}
         </p>
       )}
       {faceMode && (

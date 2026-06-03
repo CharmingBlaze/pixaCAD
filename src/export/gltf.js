@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { EditableMesh } from '../lib/mesh/EditableMesh.js';
+import { evaluateObjectMesh } from '../lib/mesh/modifiers.js';
 import { uid } from '../lib/id.js';
 import { readFileDataUrl, safeName, saveBlob } from './fileSave.js';
 
@@ -45,12 +46,13 @@ async function buildExportScene(objects) {
       nodeById.set(obj.id, group);
       continue;
     }
-    if (!obj.mesh) continue;
-    const geometry = obj.mesh.toBufferGeometry();
+    const evaluatedMesh = evaluateObjectMesh(obj);
+    if (!evaluatedMesh) continue;
+    const geometry = evaluatedMesh.toBufferGeometry();
     const texture = await dataUrlTexture(obj.textureDataUrl);
     const material = texture
       ? new THREE.MeshBasicMaterial({ map: texture, transparent: true, alphaTest: 0.001 })
-      : new THREE.MeshStandardMaterial({ color: obj.mesh.faceColors[0] ?? '#c8b070', roughness: 0.8 });
+      : new THREE.MeshStandardMaterial({ color: evaluatedMesh.faceColors[0] ?? '#c8b070', roughness: 0.8 });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = safeName(obj.name, 'Object');
     mesh.position.fromArray(obj.position);

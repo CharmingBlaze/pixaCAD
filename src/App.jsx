@@ -3,9 +3,8 @@ import { MenuBar } from './components/layout/MenuBar.jsx';
 import { ToolPalette } from './components/layout/ToolPalette.jsx';
 import { StatusBar } from './components/layout/StatusBar.jsx';
 import { Viewport } from './components/viewport/Viewport.jsx';
-import { PropertiesPanel } from './components/panels/PropertiesPanel.jsx';
+import { ObjectInspectorPanel } from './components/panels/ObjectInspectorPanel.jsx';
 import { ScenePanel } from './components/panels/ScenePanel.jsx';
-import { MaterialPropertiesPanel } from './components/panels/MaterialPropertiesPanel.jsx';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useSceneDirtyGuard } from './hooks/useSceneDirtyGuard.js';
 import { useThemeDocumentSync } from './hooks/useThemeDocumentSync.js';
@@ -57,8 +56,7 @@ export function App() {
         <Viewport />
         <div className="khedRight">
           <ScenePanel />
-          <MaterialPropertiesPanel />
-          <PropertiesPanel />
+          <ObjectInspectorPanel />
         </div>
       </div>
       <StatusBar />

@@ -39,4 +39,43 @@ describe('EditableMesh.toBufferGeometry', () => {
     expect(uvArray.slice(secondFaceStart, secondFaceStart + 4)).toEqual([0.25, 0.25, 0.75, 0.25]);
     geom.dispose();
   });
+
+  it('normalizes inward stored faces while preserving vertex UV pairings', () => {
+    const mesh = new EditableMesh({
+      name: 'InwardFrontFace',
+      positions: [
+        -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
+        -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+      ],
+      faces: [[4, 7, 6, 5]],
+      faceUVs: [[
+        [0, 0],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+      ]],
+    });
+
+    expect(mesh.faces[0]).toEqual([5, 6, 7, 4]);
+    expect(mesh.faceUVs[0]).toEqual([
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ]);
+    const geom = mesh.toBufferGeometry();
+    const pos = geom.getAttribute('position');
+    const uv = geom.getAttribute('uv');
+    const a = [pos.getX(0), pos.getY(0), pos.getZ(0)];
+    const b = [pos.getX(1), pos.getY(1), pos.getZ(1)];
+    const c = [pos.getX(2), pos.getY(2), pos.getZ(2)];
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const normalZ = ab[0] * ac[1] - ab[1] * ac[0];
+
+    expect(mesh.shouldReverseFaceWinding(0)).toBe(false);
+    expect(normalZ).toBeGreaterThan(0);
+    expect(Array.from(uv.array).slice(0, 6)).toEqual([1, 0, 1, 1, 0, 1]);
+    geom.dispose();
+  });
 });

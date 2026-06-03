@@ -31,6 +31,8 @@ export function MenuBar() {
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
   const toggleWireframe = useEditorStore((s) => s.toggleWireframe);
+  const showNormals = useEditorStore((s) => s.showNormals);
+  const toggleNormals = useEditorStore((s) => s.toggleNormals);
   const toggleXRay = useEditorStore((s) => s.toggleXRay);
   const toggleGrid = useEditorStore((s) => s.toggleGrid);
   const renderMode = useEditorStore((s) => s.renderMode);
@@ -152,35 +154,35 @@ export function MenuBar() {
               New
             </button>
             <button type="button" onClick={handleSaveProject} data-testid="menu-file-save-project">
-              Save Project…
+              Save Project
             </button>
             <button
               type="button"
               onClick={() => void handleOpenProject()}
               data-testid="menu-file-load-project"
             >
-              Load Project…
+              Load Project
             </button>
             <button type="button" onClick={() => objInputRef.current?.click()}>
-              Import OBJ + Textures…
+              Import OBJ
             </button>
             <button type="button" onClick={() => gltfInputRef.current?.click()}>
-              Import GLTF + Textures…
+              Import GLTF
             </button>
             <button type="button" onClick={handleOBJExport}>
-              Export OBJ + Textures…
+              Export OBJ
             </button>
             <button type="button" onClick={handleGLTFExport}>
-              Export GLTF + Textures…
+              Export GLTF
             </button>
             <button type="button" onClick={handleGLBExport}>
-              Export GLB + Textures…
+              Export GLB
             </button>
             <button type="button" onClick={handleSTLExport}>
-              Export STL…
+              Export STL
             </button>
             <button type="button" onClick={openRecentProject}>
-              Open Recent…
+              Open Recent
             </button>
             <input
               ref={projectInputRef}
@@ -249,6 +251,9 @@ export function MenuBar() {
           <div className="menuDropdown">
             <button type="button" onClick={toggleWireframe}>
               Toggle Wireframe
+            </button>
+            <button type="button" onClick={toggleNormals}>
+              {showNormals ? '✓ ' : ''}Show Normals
             </button>
             <button type="button" onClick={toggleXRay}>
               Toggle X-Ray

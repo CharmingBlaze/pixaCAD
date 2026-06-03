@@ -3,11 +3,32 @@ import { DEFAULT_PAINT_COLOR } from '../defaultColors.js';
 
 /** @typedef {number[]} FaceIndices */
 
+function rawFaceNormal(mesh, face) {
+  const normal = new THREE.Vector3();
+  if (!face || face.length < 3) return normal;
+
+  if (face.length === 3) {
+    const p0 = new THREE.Vector3(...mesh.getPosition(face[0]));
+    const p1 = new THREE.Vector3(...mesh.getPosition(face[1]));
+    const p2 = new THREE.Vector3(...mesh.getPosition(face[2]));
+    return normal.subVectors(p1, p0).cross(new THREE.Vector3().subVectors(p2, p0));
+  }
+
+  for (let i = 0; i < face.length; i++) {
+    const cur = mesh.getPosition(face[i]);
+    const nxt = mesh.getPosition(face[(i + 1) % face.length]);
+    normal.x += (cur[1] - nxt[1]) * (cur[2] + nxt[2]);
+    normal.y += (cur[2] - nxt[2]) * (cur[0] + nxt[0]);
+    normal.z += (cur[0] - nxt[0]) * (cur[1] + nxt[1]);
+  }
+  return normal;
+}
+
 export class EditableMesh {
   /**
-   * @param {{ name?: string, positions: number[], faces: FaceIndices[], faceColors?: string[], faceUVs?: [number, number][][], uvSeamEdges?: string[], sharpEdges?: string[] }} data
+   * @param {{ name?: string, positions: number[], faces: FaceIndices[], faceColors?: string[], faceUVs?: [number, number][][], uvSeamEdges?: string[], sharpEdges?: string[], normalizeWinding?: boolean }} data
    */
-  constructor({ name = 'Mesh', positions, faces, faceColors, faceUVs, uvSeamEdges, sharpEdges }) {
+  constructor({ name = 'Mesh', positions, faces, faceColors, faceUVs, uvSeamEdges, sharpEdges, normalizeWinding = true }) {
     this.name = name;
     this.positions = [...positions];
     this.faces = faces.map((f) => [...f]);
@@ -19,6 +40,7 @@ export class EditableMesh {
       : this.faces.map((face, faceIndex) => this.createDefaultFaceUVs(face, faceIndex));
     this.uvSeamEdges = [...(uvSeamEdges ?? [])];
     this.sharpEdges = [...(sharpEdges ?? [])];
+    if (normalizeWinding) this.normalizeFaceWinding();
   }
 
   clone() {
@@ -30,6 +52,7 @@ export class EditableMesh {
       faceUVs: this.faceUVs.map((uvs) => uvs.map((uv) => /** @type {[number, number]} */ ([uv[0], uv[1]]))),
       uvSeamEdges: [...this.uvSeamEdges],
       sharpEdges: [...this.sharpEdges],
+      normalizeWinding: false,
     });
   }
 
@@ -209,24 +232,17 @@ export class EditableMesh {
     const face = this.faces[faceIndex];
     if (!face || face.length < 3) return new THREE.Vector3(0, 1, 0);
 
-    const normal = new THREE.Vector3();
-    if (face.length === 3) {
-      const p0 = new THREE.Vector3(...this.getPosition(face[0]));
-      const p1 = new THREE.Vector3(...this.getPosition(face[1]));
-      const p2 = new THREE.Vector3(...this.getPosition(face[2]));
-      normal.subVectors(p1, p0).cross(new THREE.Vector3().subVectors(p2, p0));
-    } else {
-      for (let i = 0; i < face.length; i++) {
-        const cur = this.getPosition(face[i]);
-        const nxt = this.getPosition(face[(i + 1) % face.length]);
-        normal.x += (cur[1] - nxt[1]) * (cur[2] + nxt[2]);
-        normal.y += (cur[2] - nxt[2]) * (cur[0] + nxt[0]);
-        normal.z += (cur[0] - nxt[0]) * (cur[1] + nxt[1]);
-      }
-    }
+    const normal = rawFaceNormal(this, face);
 
     if (normal.lengthSq() < 1e-10) return new THREE.Vector3(0, 1, 0);
-    normal.normalize();
+    return normal.normalize();
+  }
+
+  getOutwardFaceNormal(faceIndex) {
+    const face = this.faces[faceIndex];
+    if (!face || face.length < 3) return new THREE.Vector3(0, 1, 0);
+
+    const normal = this.getFaceNormal(faceIndex);
 
     const faceCenter = new THREE.Vector3();
     for (const vi of face) {
@@ -238,5 +254,23 @@ export class EditableMesh {
     if (normal.dot(outward) < 0) normal.negate();
 
     return normal;
+  }
+
+  shouldReverseFaceWinding(faceIndex) {
+    const face = this.faces[faceIndex];
+    if (!face || face.length < 3) return false;
+    const raw = rawFaceNormal(this, face);
+    if (raw.lengthSq() < 1e-10) return false;
+
+    const outward = this.getOutwardFaceNormal(faceIndex);
+    return raw.dot(outward) < 0;
+  }
+
+  normalizeFaceWinding() {
+    for (let fi = 0; fi < this.faces.length; fi++) {
+      if (!this.shouldReverseFaceWinding(fi)) continue;
+      this.faces[fi] = [...this.faces[fi]].reverse();
+      this.faceUVs[fi] = [...(this.faceUVs[fi] ?? [])].reverse();
+    }
   }
 }

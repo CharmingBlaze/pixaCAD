@@ -21,6 +21,7 @@ export function useDrawInvalidate() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const renderMode = useEditorStore((s) => s.renderMode);
   const showWireframe = useEditorStore((s) => s.showWireframe);
+  const showNormals = useEditorStore((s) => s.showNormals);
   const showXRay = useEditorStore((s) => s.showXRay);
   const loopCutFactor = useEditorStore((s) => s.loopCutFactor);
   const loopCutCuts = useEditorStore((s) => s.loopCutCuts);
@@ -48,6 +49,7 @@ export function useDrawInvalidate() {
     activeTool,
     renderMode,
     showWireframe,
+    showNormals,
     showXRay,
     loopCutFactor,
     loopCutCuts,
@@ -58,4 +60,3 @@ export function useDrawInvalidate() {
     invalidate,
   ]);
 }
-

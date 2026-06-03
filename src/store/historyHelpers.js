@@ -34,12 +34,13 @@ export function cloneReferenceImagesByView(refByView) {
  * @property {string} name
  * @property {string | null} parentId
  * @property {boolean} isGroup
- * @property {{ name: string, positions: number[], faces: number[][], faceColors: string[], faceUVs?: [number, number][][] } | null} mesh
+ * @property {{ name: string, positions: number[], faces: number[][], faceColors: string[], faceUVs?: [number, number][][], preserveWinding?: boolean } | null} mesh
  * @property {[number, number, number]} position
  * @property {[number, number, number]} rotation
  * @property {[number, number, number]} scale
  * @property {string | null} textureDataUrl
  * @property {{ id: string, name: string, visible: boolean, opacity: number, kind?: string, dataUrl: string | null }[]} textureLayers
+ * @property {{ mirrorEnabled?: boolean, mirrorAxis?: 'x' | 'y' | 'z', subdivisionLevel?: number }} meshModifiers
  * @property {boolean} visible
  * @property {boolean} locked
  */
@@ -97,6 +98,7 @@ function normalizeMeshSnapshot(mesh) {
     ...(hasAllUvs ? { faceUVs } : {}),
     uvSeamEdges: Array.isArray(mesh.uvSeamEdges) ? mesh.uvSeamEdges.map(String) : [],
     sharpEdges: Array.isArray(mesh.sharpEdges) ? mesh.sharpEdges.map(String) : [],
+    preserveWinding: mesh.preserveWinding === true,
   };
 }
 
@@ -120,6 +122,7 @@ export function snapshotObjects(objects) {
           faceUVs: o.mesh.faceUVs.map((uvs) => uvs.map((uv) => [uv[0], uv[1]])),
           uvSeamEdges: [...(o.mesh.uvSeamEdges ?? [])],
           sharpEdges: [...(o.mesh.sharpEdges ?? [])],
+          preserveWinding: true,
         },
     position: [...o.position],
     rotation: [...o.rotation],
@@ -135,6 +138,14 @@ export function snapshotObjects(objects) {
           dataUrl: typeof layer.dataUrl === 'string' ? layer.dataUrl : null,
         }))
       : [],
+    meshModifiers: {
+      mirrorEnabled: !!o.meshModifiers?.mirrorEnabled,
+      mirrorAxis:
+        o.meshModifiers?.mirrorAxis === 'y' || o.meshModifiers?.mirrorAxis === 'z'
+          ? o.meshModifiers.mirrorAxis
+          : 'x',
+      subdivisionLevel: o.meshModifiers?.subdivisionLevel ? 1 : 0,
+    },
     visible: o.visible !== false,
     locked: !!o.locked,
   }));
@@ -155,7 +166,7 @@ export function restoreObjects(snapshots) {
       name: String(o.name || 'Object'),
       parentId: o.parentId ?? null,
       isGroup,
-      mesh: meshData ? new EditableMesh(meshData) : null,
+      mesh: meshData ? new EditableMesh({ ...meshData, normalizeWinding: !meshData.preserveWinding }) : null,
       position: Array.isArray(o.position) && o.position.length === 3
         ? o.position.map(Number)
         : [0, 0, 0],
@@ -176,6 +187,14 @@ export function restoreObjects(snapshots) {
               dataUrl: typeof layer.dataUrl === 'string' ? layer.dataUrl : null,
             }))
         : [],
+      meshModifiers: {
+        mirrorEnabled: !!o.meshModifiers?.mirrorEnabled,
+        mirrorAxis:
+          o.meshModifiers?.mirrorAxis === 'y' || o.meshModifiers?.mirrorAxis === 'z'
+            ? o.meshModifiers.mirrorAxis
+            : 'x',
+        subdivisionLevel: o.meshModifiers?.subdivisionLevel ? 1 : 0,
+      },
       visible: o.visible !== false,
       locked: !!o.locked,
     };
