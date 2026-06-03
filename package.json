@@ -10,7 +10,9 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:headed": "npm run build && playwright test --headed",
-    "themes": "node scripts/build-themes.mjs"
+    "themes": "node scripts/build-themes.mjs",
+    "desktop:dev": "wails dev",
+    "desktop:build": "wails build"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",

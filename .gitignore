@@ -1,5 +1,8 @@
 node_modules/
 dist/
+build/
+wailsjs/
+package.json.md5
 playwright-report/
 test-results/
 .vite/

@@ -1,7 +1,7 @@
 import { DEFAULT_PAINT_COLOR } from '../lib/defaultColors.js';
 import { APP_ID, BRAND_NAME, isValidProjectApp, PROJECT_FILE_NAME } from '../lib/brand.js';
 import { restoreObjects, snapshotObjects } from '../store/historyHelpers.js';
-import { readFileText, saveBlob } from './fileSave.js';
+import { readFileText, saveTextNative, openTextNative } from './fileSave.js';
 
 const PROJECT_VERSION = 2;
 
@@ -147,12 +147,11 @@ export async function saveProject(state) {
         : `Could not serialize project: ${message}`,
     );
   }
-  await saveBlob(new Blob([text], { type: 'application/json' }), PROJECT_FILE_NAME, `${BRAND_NAME} project`);
+  await saveTextNative(text, PROJECT_FILE_NAME, `${BRAND_NAME} project`);
 }
 
-export async function loadProjectFile(file) {
-  if (!file) throw new Error('No project file selected');
-  const text = await readFileText(file);
+/** @param {string} text */
+export function parseProjectText(text) {
   let project;
   try {
     project = JSON.parse(text);
@@ -173,4 +172,17 @@ export async function loadProjectFile(file) {
     throw new Error(`Project version ${version} is newer than this app supports`);
   }
   return normalizeLoadedProject(project);
+}
+
+/** Load a project via the native open dialog (desktop only). */
+export async function loadProjectFromDesktop() {
+  const text = await openTextNative(`Open ${BRAND_NAME} project`);
+  if (!text) return null;
+  return parseProjectText(text);
+}
+
+export async function loadProjectFile(file) {
+  if (!file) throw new Error('No project file selected');
+  const text = await readFileText(file);
+  return parseProjectText(text);
 }

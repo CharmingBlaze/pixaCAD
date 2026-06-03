@@ -1,3 +1,5 @@
+import { blobToBase64, getDesktopApp, isDesktopApp } from '../lib/desktop.js';
+
 export function safeName(name, fallback = 'asset') {
   return String(name || fallback)
     .trim()
@@ -15,6 +17,14 @@ export function dataUrlToBlob(dataUrl) {
 }
 
 export async function saveBlob(blob, filename, description = 'File') {
+  const desktop = getDesktopApp();
+  if (isDesktopApp() && desktop) {
+    const base64 = await blobToBase64(blob);
+    const path = await desktop.SaveBinaryFile(filename, base64, description);
+    if (path) return;
+    return;
+  }
+
   if ('showSaveFilePicker' in window) {
     try {
       const ext = filename.includes('.') ? `.${filename.split('.').pop()}` : '';
@@ -43,7 +53,21 @@ export function saveText(text, filename, type = 'text/plain') {
   return saveBlob(new Blob([text], { type }), filename, 'Text file');
 }
 
+/** @param {{ name: string, blob: Blob }[]} files @param {string} [folderName] */
 export async function saveFiles(files, folderName = 'export') {
+  const desktop = getDesktopApp();
+  if (isDesktopApp() && desktop) {
+    const payload = await Promise.all(
+      files.map(async (file) => ({
+        name: file.name,
+        data: await blobToBase64(file.blob),
+      })),
+    );
+    const dir = await desktop.ExportFiles(payload);
+    if (dir) return;
+    return;
+  }
+
   if ('showDirectoryPicker' in window) {
     try {
       const dir = await window.showDirectoryPicker({ mode: 'readwrite', suggestedName: folderName });
@@ -78,4 +102,23 @@ export function readFileDataUrl(file) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+/** @param {string} text @param {string} filename @param {string} [dialogTitle] @returns {Promise<string | null>} saved path or null if cancelled */
+export async function saveTextNative(text, filename, dialogTitle = 'Save file') {
+  const desktop = getDesktopApp();
+  if (isDesktopApp() && desktop) {
+    const path = await desktop.SaveTextFile(filename, text, dialogTitle);
+    return path || null;
+  }
+  await saveText(text, filename);
+  return filename;
+}
+
+/** @param {string} [dialogTitle] @returns {Promise<string | null>} */
+export async function openTextNative(dialogTitle = 'Open file') {
+  const desktop = getDesktopApp();
+  if (!isDesktopApp() || !desktop) return null;
+  const text = await desktop.OpenTextFile(dialogTitle);
+  return text || null;
 }

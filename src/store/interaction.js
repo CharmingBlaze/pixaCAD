@@ -13,6 +13,7 @@ export function isInteractionBlocked(state) {
     state.bevelActive ||
     state.knifeActive ||
     state.interactiveTransformActive ||
+    state.gizmoInteracting ||
     (state.vertexManipActive && state.vertexManipSession)
   );
 }

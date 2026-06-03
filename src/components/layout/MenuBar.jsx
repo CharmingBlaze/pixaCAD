@@ -2,8 +2,9 @@ import { useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore.js';
 import { importOBJFiles } from '../../export/obj.js';
 import { importGLTFFiles } from '../../export/gltf.js';
-import { loadProjectFile, saveProject } from '../../export/project.js';
+import { loadProjectFile, loadProjectFromDesktop, saveProject } from '../../export/project.js';
 import { confirmDiscardChanges } from '../../lib/confirmDiscard.js';
+import { isDesktopApp } from '../../lib/desktop.js';
 import { BRAND_NAME, PROJECT_FILE_ACCEPT } from '../../lib/brand.js';
 import { THEMES } from '../../lib/themes.js';
 import { HelpMenu } from './HelpMenu.jsx';
@@ -53,6 +54,22 @@ export function MenuBar() {
       setStatus('Project saved');
     } catch (err) {
       setStatus(`Project save failed: ${err.message}`);
+    }
+  };
+  const handleOpenProject = async () => {
+    if (!(await confirmDiscardChanges(sceneDirty))) return;
+    try {
+      if (isDesktopApp()) {
+        const project = await loadProjectFromDesktop();
+        if (project) {
+          loadProjectState(project);
+          setStatus('Project loaded');
+        }
+        return;
+      }
+      projectInputRef.current?.click();
+    } catch (err) {
+      setStatus(`Project load failed: ${err.message}`);
     }
   };
   const openRecentProject = useEditorStore((s) => s.openRecentProject);
@@ -139,7 +156,7 @@ export function MenuBar() {
             </button>
             <button
               type="button"
-              onClick={() => projectInputRef.current?.click()}
+              onClick={() => void handleOpenProject()}
               data-testid="menu-file-load-project"
             >
               Load Project…

@@ -257,6 +257,7 @@ export function SceneObject({
     let st = useEditorStore.getState();
     if (
       e.button !== 0 ||
+      st.gizmoInteracting ||
       (st.vertexManipActive && st.vertexManipSession) ||
       st.pendingPrimitive ||
       st.extrudeActive ||
@@ -288,20 +289,36 @@ export function SceneObject({
       return;
     }
 
-    objectDragRef.current = {
-      pointerId: e.pointerId,
-      downX: e.nativeEvent.clientX,
-      downY: e.nativeEvent.clientY,
-      started: false,
-      plane: _dragPlane.clone(),
-      startHit: _startHit.clone(),
-      startPos: _startPos.clone(),
-    };
+    const pointerId = e.pointerId;
+    const downX = e.nativeEvent.clientX;
+    const downY = e.nativeEvent.clientY;
+    const plane = _dragPlane.clone();
+    const startHit = _startHit.clone();
+    const startPos = _startPos.clone();
+
+    // Defer arming so TransformControls pointer/mouse handlers can set gizmoInteracting first.
+    requestAnimationFrame(() => {
+      const live = useEditorStore.getState();
+      if (live.gizmoInteracting || live.marqueeActive) return;
+      if (live.editMode !== 'object' || live.transformMode !== 'translate') return;
+      if (live.interactiveTransformActive || live.extrudeActive || live.knifeActive) return;
+
+      objectDragRef.current = {
+        pointerId,
+        downX,
+        downY,
+        started: false,
+        plane,
+        startHit,
+        startPos,
+      };
+    });
   };
 
   useEffect(() => {
     const onPointerMove = (event) => {
-      if (useEditorStore.getState().marqueeActive) {
+      const live = useEditorStore.getState();
+      if (live.marqueeActive || live.gizmoInteracting) {
         objectDragRef.current = null;
         return;
       }
@@ -360,7 +377,8 @@ export function SceneObject({
     };
 
     const onPointerUp = () => {
-      if (useEditorStore.getState().marqueeActive) {
+      const live = useEditorStore.getState();
+      if (live.marqueeActive || live.gizmoInteracting) {
         objectDragRef.current = null;
         return;
       }

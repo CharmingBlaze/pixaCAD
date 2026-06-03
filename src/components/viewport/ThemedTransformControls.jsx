@@ -46,36 +46,28 @@ export function ThemedTransformControls({ ref: forwardedRef, mode, ...props }) {
     const tc = innerRef.current;
     if (!tc || !orbitControls) return;
 
+    const setGizmoInteracting = useEditorStore.getState().setGizmoInteracting;
+
     const onDragging = (event) => {
       orbitControls.enabled = !event.value;
+      setGizmoInteracting(!!event.value);
     };
     const releaseOrbit = () => {
       if (tc.dragging) tc.dragging = false;
       orbitControls.enabled = true;
+      setGizmoInteracting(false);
     };
 
-    const setGizmoInteracting = useEditorStore.getState().setGizmoInteracting;
-    const onGizmoDown = () => setGizmoInteracting(true);
-    const onGizmoUp = () => setGizmoInteracting(false);
-
     tc.addEventListener('dragging-changed', onDragging);
-    tc.addEventListener('mouseDown', onGizmoDown);
-    tc.addEventListener('mouseUp', onGizmoUp);
     tc.addEventListener('mouseUp', releaseOrbit);
     window.addEventListener('pointerup', releaseOrbit);
     window.addEventListener('pointercancel', releaseOrbit);
-    window.addEventListener('pointerup', onGizmoUp);
-    window.addEventListener('pointercancel', onGizmoUp);
 
     return () => {
       tc.removeEventListener('dragging-changed', onDragging);
-      tc.removeEventListener('mouseDown', onGizmoDown);
-      tc.removeEventListener('mouseUp', onGizmoUp);
       tc.removeEventListener('mouseUp', releaseOrbit);
       window.removeEventListener('pointerup', releaseOrbit);
       window.removeEventListener('pointercancel', releaseOrbit);
-      window.removeEventListener('pointerup', onGizmoUp);
-      window.removeEventListener('pointercancel', onGizmoUp);
       if (tc.dragging) tc.dragging = false;
       orbitControls.enabled = true;
       setGizmoInteracting(false);
